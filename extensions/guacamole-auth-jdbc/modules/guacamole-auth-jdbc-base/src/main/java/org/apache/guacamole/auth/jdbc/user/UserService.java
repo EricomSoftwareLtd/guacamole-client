@@ -27,12 +27,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
-import org.apache.guacamole.net.auth.Credentials;
-import org.apache.guacamole.auth.jdbc.base.ModeledDirectoryObjectMapper;
-import org.apache.guacamole.auth.jdbc.base.ModeledDirectoryObjectService;
 import org.apache.guacamole.GuacamoleClientException;
 import org.apache.guacamole.GuacamoleException;
 import org.apache.guacamole.GuacamoleUnsupportedException;
+import org.apache.guacamole.auth.jdbc.base.ModeledDirectoryObjectMapper;
+import org.apache.guacamole.auth.jdbc.base.ModeledDirectoryObjectService;
 import org.apache.guacamole.auth.jdbc.JDBCEnvironment;
 import org.apache.guacamole.auth.jdbc.base.ActivityRecordModel;
 import org.apache.guacamole.auth.jdbc.base.ActivityRecordSearchTerm;
@@ -51,12 +50,14 @@ import org.apache.guacamole.language.TranslatableGuacamoleInsufficientCredential
 import org.apache.guacamole.net.auth.ActivityRecord;
 import org.apache.guacamole.net.auth.AuthenticatedUser;
 import org.apache.guacamole.net.auth.AuthenticationProvider;
+import org.apache.guacamole.net.auth.Credentials;
 import org.apache.guacamole.net.auth.User;
 import org.apache.guacamole.net.auth.credentials.CredentialsInfo;
 import org.apache.guacamole.net.auth.permission.ObjectPermission;
 import org.apache.guacamole.net.auth.permission.ObjectPermissionSet;
 import org.apache.guacamole.net.auth.permission.SystemPermission;
 import org.apache.guacamole.net.auth.permission.SystemPermissionSet;
+import org.apache.guacamole.properties.CaseSensitivity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,13 +157,13 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
      */
     @Inject
     private PasswordPolicyService passwordPolicyService;
-    
+
     /**
      * The server environment for retrieving configuration.
      */
     @Inject
     private JDBCEnvironment environment;
-
+    
     @Override
     protected ModeledDirectoryObjectMapper<UserModel> getObjectMapper() {
         return userMapper;
@@ -196,7 +197,8 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
         // Produce ModeledUser exposing only those attributes for which the
         // current user has permission
         ModeledUser user = userProvider.get();
-        user.init(currentUser, model, exposeRestrictedAttributes);
+        user.init(currentUser, model, exposeRestrictedAttributes,
+                environment.getCaseSensitivity().caseSensitiveUsernames());
         return user;
 
     }
@@ -219,8 +221,8 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
     }
     
     @Override
-    protected boolean getCaseSensitiveIdentifiers() throws GuacamoleException {
-        return environment.getCaseSensitiveUsernames();
+    protected CaseSensitivity getCaseSensitivity() throws GuacamoleException {
+        return environment.getCaseSensitivity();
     }
 
     @Override
@@ -254,7 +256,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
         
         // Do not create duplicate users
         Collection<UserModel> existing = userMapper.select(Collections.singleton(
-                    model.getIdentifier()), environment.getCaseSensitiveUsernames());
+                    model.getIdentifier()), getCaseSensitivity());
         if (!existing.isEmpty())
             throw new GuacamoleClientException("User \"" + model.getIdentifier() + "\" already exists.");
 
@@ -291,7 +293,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
         
         // Check whether such a user is already present
         UserModel existing = userMapper.selectOne(model.getIdentifier(),
-                environment.getCaseSensitiveUsernames());
+                getCaseSensitivity());
         if (existing != null) {
 
             // Do not rename to existing user
@@ -359,7 +361,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
         beforeDelete(user, identifier);
         
         // Delete object
-        userMapper.delete(identifier, environment.getCaseSensitiveUsernames());
+        userMapper.delete(identifier, getCaseSensitivity());
 
     }
 
@@ -401,7 +403,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
 
         // Retrieve corresponding user model, if such a user exists
         UserModel userModel = userMapper.selectOne(username,
-                environment.getCaseSensitiveUsernames());
+                getCaseSensitivity());
         if (userModel == null)
             return null;
 
@@ -443,7 +445,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
 
         // Retrieve corresponding user model, if such a user exists
         UserModel userModel = userMapper.selectOne(authenticatedUser.getIdentifier(),
-                environment.getCaseSensitiveUsernames());
+                getCaseSensitivity());
         if (userModel == null)
             return null;
 
@@ -642,7 +644,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
         if (user.isPrivileged() || user.getUser().getEffectivePermissions().getSystemPermissions().hasPermission(SystemPermission.Type.AUDIT))
             searchResults = userRecordMapper.search(username, recordIdentifier,
                     requiredContents, sortPredicates, limit,
-                    environment.getCaseSensitiveUsernames());
+                    getCaseSensitivity());
 
         // Otherwise only return explicitly readable history records
         else
@@ -650,7 +652,7 @@ public class UserService extends ModeledDirectoryObjectService<ModeledUser, User
                     user.getUser().getModel(), recordIdentifier,
                     requiredContents, sortPredicates, limit,
                     user.getEffectiveUserGroups(),
-                    environment.getCaseSensitiveUsernames());
+                    getCaseSensitivity());
 
         return getObjectInstances(searchResults);
 

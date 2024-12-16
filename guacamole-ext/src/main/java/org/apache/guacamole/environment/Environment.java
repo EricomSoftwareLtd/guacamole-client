@@ -24,14 +24,19 @@ import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.guacamole.GuacamoleException;
 import org.apache.guacamole.GuacamoleUnsupportedException;
 import org.apache.guacamole.net.auth.GuacamoleProxyConfiguration;
 import org.apache.guacamole.properties.BooleanGuacamoleProperty;
+import org.apache.guacamole.properties.CaseSensitivity;
+import org.apache.guacamole.properties.EnumGuacamoleProperty;
 import org.apache.guacamole.properties.GuacamoleProperty;
 import org.apache.guacamole.properties.IntegerGuacamoleProperty;
 import org.apache.guacamole.properties.StringGuacamoleProperty;
 import org.apache.guacamole.protocols.ProtocolInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The environment of an arbitrary Guacamole instance, describing available
@@ -71,15 +76,16 @@ public interface Environment {
     };
     
     /**
-     * A property that configures whether or not Guacamole will take case
-     * into account when comparing and processing usernames.
+     * A property that configures how Guacamole handles case sensitivity - it
+     * can be enabled for both usernames and group names, just usernames, just
+     * group names, or disabled for both.
      */
-    public static final BooleanGuacamoleProperty CASE_SENSITIVE_USERNAMES =
-            new BooleanGuacamoleProperty() {
-        
+    public static final EnumGuacamoleProperty<CaseSensitivity> CASE_SENSITIVITY =
+            new EnumGuacamoleProperty<CaseSensitivity>(CaseSensitivity.class) {
+    
         @Override
-        public String getName() { return "case-sensitive-usernames"; }
-        
+        public String getName() { return "case-sensitivity"; }
+
     };
 
     /**
@@ -180,18 +186,7 @@ public interface Environment {
      */
     public default <Type> Collection<Type> getPropertyCollection(
             GuacamoleProperty<Type> property) throws GuacamoleException {
-        
-        /* Pull the given property as a string. */
-        StringGuacamoleProperty stringProperty = new StringGuacamoleProperty() {
-            
-            @Override
-            public String getName() { return property.getName(); }
-            
-        };
-        
-        /* Parse the string to a Collection of the desired type. */
-        return property.parseValueCollection(getProperty(stringProperty));
-        
+        return new DefaultEnvironment(this).getPropertyCollection(property);
     }
     
     /**
@@ -224,23 +219,7 @@ public interface Environment {
     public default <Type> Collection<Type> getPropertyCollection(
             GuacamoleProperty<Type> property, Type defaultValue)
             throws GuacamoleException {
-        
-        /* Pull the given property as a string. */
-        StringGuacamoleProperty stringProperty = new StringGuacamoleProperty() {
-            
-            @Override
-            public String getName() { return property.getName(); }
-            
-        };
-        
-        /* Check the value and return the default if null. */
-        String stringValue = getProperty(stringProperty);
-        if (stringValue == null)
-            return Collections.singletonList(defaultValue);
-        
-        /* Parse the string and return the collection. */
-        return property.parseValueCollection(stringValue);
-        
+        return new DefaultEnvironment(this).getPropertyCollection(property, defaultValue);
     }
     
     /**
@@ -273,23 +252,7 @@ public interface Environment {
     public default <Type> Collection<Type> getPropertyCollection(
             GuacamoleProperty<Type> property, Collection<Type> defaultValue)
             throws GuacamoleException {
-        
-        /* Pull the given property as a string. */
-        StringGuacamoleProperty stringProperty = new StringGuacamoleProperty() {
-            
-            @Override
-            public String getName() { return property.getName(); }
-            
-        };
-        
-        /* Check the value and return the default if null. */
-        String stringValue = getProperty(stringProperty);
-        if (stringValue == null)
-            return defaultValue;
-        
-        /* Parse the string and return the collection. */
-        return property.parseValueCollection(stringValue);
-        
+        return new DefaultEnvironment(this).getPropertyCollection(property, defaultValue);
     }
     
     /**
@@ -332,18 +295,7 @@ public interface Environment {
      */
     public default <Type> Collection<Type> getRequiredPropertyCollection(
             GuacamoleProperty<Type> property) throws GuacamoleException {
-        
-        /* Pull the given property as a string. */
-        StringGuacamoleProperty stringProperty = new StringGuacamoleProperty() {
-            
-            @Override
-            public String getName() { return property.getName(); }
-            
-        };
-        
-        /* Parse the string to a Collection of the desired type. */
-        return property.parseValueCollection(getRequiredProperty(stringProperty));
-        
+        return new DefaultEnvironment(this).getRequiredPropertyCollection(property);
     }
 
     /**
@@ -375,27 +327,20 @@ public interface Environment {
      */
     public default void addGuacamoleProperties(GuacamoleProperties properties)
             throws GuacamoleException {
-        throw new GuacamoleUnsupportedException(String.format("%s does not "
-                + "support dynamic definition of Guacamole properties.",
-                getClass()));
+        new DefaultEnvironment(this).addGuacamoleProperties(properties);
     }
-    
+
     /**
-     * Returns true if Guacamole should consider case when comparing and
-     * processing usernames (case-sensitive), or false if case should not be
-     * considered (case-insensitive). Because the past behavior of Guacamole,
-     * prior to the introduction of this option, was case-sensitive, the default
-     * value is true.
+     * Returns the case sensitivity configuration for Guacamole as defined
+     * in guacamole.properties, or the default of enabling case sensitivity
+     * for both usernames and group names.
      * 
      * @return
-     *     true if Guacamole should consider usernames case-sensitive, otherwise
-     *     false.
-     * 
-     * @throws GuacamoleException 
-     *     If guacamole.properties cannot be parsed.
+     *     The case sensitivity setting as configured in guacamole.properties,
+     *     or the default of enabling case sensitivity.
      */
-    public default boolean getCaseSensitiveUsernames() throws GuacamoleException {
-        return getProperty(CASE_SENSITIVE_USERNAMES, true);
+    public default CaseSensitivity getCaseSensitivity() {
+        return new DefaultEnvironment(this).getCaseSensitivity();
     }
 
 }
