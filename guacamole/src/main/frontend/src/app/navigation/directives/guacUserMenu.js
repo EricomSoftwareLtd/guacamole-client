@@ -155,8 +155,9 @@ angular.module('navigation').directive('guacUserMenu', [function guacUserMenu() 
 
             /**
              * All available actions for the current user.
+             * $scope.actions = [ LOGOUT_ACTION ];
              */
-            $scope.actions = [ LOGOUT_ACTION ];
+            $scope.actions = [];
 
         }] // end controller
 
