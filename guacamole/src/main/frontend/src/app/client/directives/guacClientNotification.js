@@ -130,7 +130,7 @@ angular.module('client').directive('guacClientNotification', [function guacClien
 
         /**
          * Action which replaces the current client with a newly-connected client.
-         */
+     
         const RECONNECT_ACTION = {
             name      : "CLIENT.ACTION_RECONNECT",
             className : "reconnect button",
@@ -139,7 +139,7 @@ angular.module('client').directive('guacClientNotification', [function guacClien
                 $scope.status = false;
             }
         };
-
+    */
         /**
          * The reconnect countdown to display if an error or status warrants an
          * automatic, timed reconnect.
