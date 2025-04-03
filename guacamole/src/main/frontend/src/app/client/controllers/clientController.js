@@ -771,7 +771,7 @@ angular.module('client').controller('clientController', ['$scope', '$routeParams
     $scope.toggleFullscreenMode = guacFullscreen.toggleFullscreenMode;
 
     // Set client-specific menu actions
-    $scope.clientMenuActions = [ DISCONNECT_MENU_ACTION,FULLSCREEN_MENU_ACTION ];
+    $scope.clientMenuActions = [ FULLSCREEN_MENU_ACTION ];
 
     /**
      * @borrows Protocol.getNamespace
