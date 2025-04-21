@@ -67,6 +67,7 @@ import org.apache.guacamole.auth.jdbc.sharingprofile.SharingProfileParameterMode
 import org.apache.guacamole.auth.jdbc.user.RemoteAuthenticatedUser;
 import org.apache.guacamole.net.auth.GuacamoleProxyConfiguration;
 import org.apache.guacamole.protocol.FailoverGuacamoleSocket;
+import org.apache.guacamole.properties.CaseSensitivity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -479,7 +480,7 @@ public abstract class AbstractGuacamoleTunnelService implements GuacamoleTunnelS
         try {
             // This MUST happen before getUUID() is invoked, to ensure the ID driving the UUID exists
             connectionRecordMapper.insert(activeConnection.getModel(),
-                    environment.getCaseSensitiveUsernames()); 
+                    environment.getCaseSensitivity());
             activeTunnels.put(activeConnection.getUUID().toString(), activeConnection);
         }
 
@@ -638,7 +639,7 @@ public abstract class AbstractGuacamoleTunnelService implements GuacamoleTunnelS
             identifiers = getPreferredConnections(user, identifiers);
 
         // Retrieve all children
-        Collection<ConnectionModel> models = connectionMapper.select(identifiers, false);
+        Collection<ConnectionModel> models = connectionMapper.select(identifiers, environment.getCaseSensitivity());
         List<ModeledConnection> connections = new ArrayList<ModeledConnection>(models.size());
 
         // Convert each retrieved model to a modeled connection
@@ -679,7 +680,8 @@ public abstract class AbstractGuacamoleTunnelService implements GuacamoleTunnelS
         // Produce collection of readable connection identifiers
         Collection<ConnectionModel> connections =
                 connectionMapper.selectReadable(user.getUser().getModel(),
-                        identifiers, user.getEffectiveUserGroups(), false);
+                        identifiers, user.getEffectiveUserGroups(),
+                        environment.getCaseSensitivity());
 
         // Ensure set contains only identifiers of readable connections
         identifiers.clear();
