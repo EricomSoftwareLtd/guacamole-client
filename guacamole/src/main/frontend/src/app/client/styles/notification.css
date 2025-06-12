@@ -93,3 +93,16 @@
     border: 2px solid white;
     color: white; 
 }
+
+.notification-header {
+    text-align: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #ddd;
+}
+
+.notification-header .ncx-logo {
+    height: 64px;
+    object-fit: contain;
+    padding: 16px;
+    width: 180px;
+}
