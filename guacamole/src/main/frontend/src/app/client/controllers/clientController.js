@@ -789,7 +789,7 @@ angular.module('client').controller('clientController', ['$scope', '$routeParams
 
     $scope.toggleToolbarVisibility = function toggleToolbarVisibility(filesystems) {
       if (!(filesystems && filesystems[0])) {
-        scope.toolbar.shown = false;
+        $scope.toolbar.shown = false;
         return;
       }
       if (!$scope.toolbar.dragging) {
@@ -803,6 +803,35 @@ angular.module('client').controller('clientController', ['$scope', '$routeParams
     $scope.showMenu = function showMenu() {
       $scope.menu.shown = true;
     };
+
+    // Listen for sticky toolbar file transfer menu request
+    $scope.$on('guacShowFilesystemMenu', function () {
+        $scope.toolbar.shown = !$scope.toolbar.shown
+        if(!$scope.toolbar.shown) {
+            $scope.$applyAsync()
+            return
+        }
+        
+        if (!($scope.focusedClient && $scope.focusedClient.filesystems && $scope.focusedClient.filesystems.length > 0)) {
+            return
+        }
+
+        $scope.showFilesystemMenu($scope.focusedClient.filesystems[0]);
+        $scope.toolbar.shown = true;
+        $scope.$applyAsync()
+    });
+
+    // Listen for sticky toolbar OSK request
+    $scope.$on('guacShowOSK', function() {
+        if ($scope.menu.inputMethod != 'osk') {
+            $scope.menu.inputMethod = 'osk';
+            $scope.showOSK = true;
+        }   else {
+            $scope.menu.inputMethod = 'none'
+            $scope.showOSK = false;
+        } 
+        $scope.$applyAsync();
+    });
 
     /**
      * Shows the filesystem menu, displaying the contents of the given

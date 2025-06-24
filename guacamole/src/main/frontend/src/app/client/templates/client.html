@@ -1,5 +1,4 @@
-
-  <guac-viewport>
+<guac-viewport>
       <div id="client-container">  
           <div id="menu-container">
               <!-- Menu -->
@@ -233,8 +232,8 @@
           {{'CLIENT.TEXT_CLIENT_STATUS_UNSTABLE' | translate}}
       </div>
 
-      <!-- Floating button -->
-      <button 
+      <!-- Floating filesystem button -->
+      <!-- <button 
         guac-draggable
         dragging="toolbar.dragging"
         id="floatingButton"
@@ -259,6 +258,9 @@
             d="M12,3.41,10.09,1.5H1.5V20.59A1.9,1.9,0,0,0,3.41,22.5H20.59a1.9,1.9,0,0,0,1.91-1.91V3.41Z" />
           <line class="cls-1" x1="1.5" y1="7.23" x2="22.5" y2="7.23" />
         </svg>
-      </button>
+      </button> -->
+
+
+      <sticky-toolbar focused-client="focusedClient"></sticky-toolbar>
 
   </guac-viewport>

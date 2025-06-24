@@ -1,0 +1,62 @@
+<div class="sticky-toolbar-container">
+    <!-- COLLAPSED STATE -->
+    <div class="toolbar-collapsed" ng-if="!isExpanded" ng-click="toggleExpand()">
+        <!-- Arrow Down SVG -->
+        <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+        </svg>
+    </div>
+
+    <!-- EXPANDED STATE -->
+    <div class="toolbar-expanded" ng-if="isExpanded">
+        <div class="toolbar-flex-row">
+            <div class="toolbar-buttons">
+                <button ng-if="focusedClient && focusedClient.filesystems && focusedClient.filesystems.length"
+                    ng-click="fileTransfer()" title="File Transfer">
+                    <!-- File Transfer SVG -->
+                    <svg style="width: 35px" viewBox="0 0 24 24" fill="currentColor">
+                        <defs>
+                            <style>
+                                .cls-1 {
+                                    fill: none;
+                                    stroke: white;
+                                    stroke-miterlimit: 10;
+                                    stroke-width: 1.91px;
+                                }
+                            </style>
+                        </defs>
+                        <polyline class="cls-1" points="12 10.09 9.14 12.96 16.77 12.96" />
+                        <polyline class="cls-1" points="12 19.64 14.86 16.77 7.23 16.77" />
+                        <path class="cls-1"
+                            d="M12,3.41,10.09,1.5H1.5V20.59A1.9,1.9,0,0,0,3.41,22.5H20.59a1.9,1.9,0,0,0,1.91-1.91V3.41Z" />
+                        <line class="cls-1" x1="1.5" y1="7.23" x2="22.5" y2="7.23" />
+                    </svg>
+                </button>
+                <button ng-click="toggleKeyboard()" title="Toggle Keyboard">
+                    <!-- Keyboard SVG -->
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zm-3-3h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z" />
+                    </svg>
+                </button>
+                <button ng-click="sendCtrlAltDel()" title="Send Ctrl+Alt+Del">
+                    <!-- Ctrl+Alt+Del SVG -->
+                    <svg width="45" height="40" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+                        <text x="30" y="20" font-family="monospace" font-size="15" text-anchor="middle"
+                            dominant-baseline="middle" fill="currentColor">CTRL ALT</text>
+                        <line x1="0" y1="30" x2="60" y2="30" stroke="currentColor" stroke-width="1"></line>
+                        <text x="30" y="42" font-family="monospace" font-size="20" text-anchor="middle"
+                            dominant-baseline="middle" fill="currentColor">DEL</text>
+                    </svg>
+                </button>
+                <button ng-click="toggleExpand()" title="Collapse">
+                    <!-- Arrow Up SVG -->
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6 1.41 1.41z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
