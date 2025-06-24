@@ -1,0 +1,146 @@
+:root {
+    --velvet-gray: #333f48;
+    --velvet-light-gray-20: #ededef;
+    --velvet-gray-hover: #23292e;
+    --velvet-separator: #444c54;
+    --velvet-icon-hover: #fff;
+    --velvet-toolbar-radius: 18px;
+}
+
+body {
+    margin: 0;
+    padding-top: 30px;
+    font-family: sans-serif;
+}
+
+.content-placeholder {
+    padding: 20px;
+    margin-top: 30px; /* Ensure content is below toolbar */
+}
+
+.sticky-toolbar-container {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background-color: var(--velvet-gray);
+    color: var(--velvet-light-gray-20);
+    transition: all 0.3s ease-in-out;
+    border-radius: 0 0 var(--velvet-toolbar-radius) var(--velvet-toolbar-radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    padding: 0;
+}
+
+/* --- COLLAPSED STATE --- */
+.toolbar-collapsed {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 60px;
+    height: 30px;
+    cursor: pointer;
+    border-radius: 8px;
+    /* box-shadow: 0 2px 5px rgba(0, 0, 0, .2); */
+}
+.toolbar-collapsed:hover {
+    background-color: var(--velvet-gray-hover);
+}
+.toolbar-collapsed svg {
+    fill: var(--velvet-light-gray-20);
+}
+
+/* --- EXPANDED STATE --- */
+.toolbar-expanded {
+    display: inline-block;
+    padding: 0;
+    border-radius: 0 0 var(--velvet-toolbar-radius) var(--velvet-toolbar-radius);
+    background: transparent;
+}
+
+.toolbar-flex-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0
+}
+
+.toolbar-buttons {
+    display: flex;
+    gap: 0;
+    flex: 1 1 auto;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+}
+.toolbar-buttons button {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    min-width: 0;
+    width: 70px;
+    height: 58px;
+    justify-content: center;
+    transition: background 0.18s;
+    box-shadow: none;
+}
+.toolbar-buttons button:hover {
+    background: rgba(237,237,239,0.08);
+}
+.toolbar-buttons button svg {
+    fill: var(--velvet-light-gray-20);
+    width: 45px;
+    height: 40px;
+    transition: fill 0.18s;
+}
+.toolbar-buttons button:hover svg {
+    fill: var(--velvet-icon-hover);
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 32px;
+    background: var(--velvet-separator);
+    margin: 0 2px;
+    border-radius: 2px;
+}
+
+.toolbar-collapse-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    margin-left: 18px;
+}
+.collapse-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    box-shadow: none;
+    transition: background 0.18s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collapse-btn:hover {
+    background: rgba(237,237,239,0.08);
+}
+.collapse-btn svg {
+    fill: var(--velvet-light-gray-20);
+    width: 28px;
+    height: 28px;
+    transition: fill 0.18s;
+}
+.collapse-btn:hover svg {
+    fill: var(--velvet-icon-hover);
+}
