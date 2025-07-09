@@ -261,6 +261,7 @@
       </button> -->
 
 
-      <sticky-toolbar focused-client="focusedClient"></sticky-toolbar>
+      <sticky-toolbar focused-client="focusedClient"
+      ng-if="focusedClient && focusedClient.clientState.connectionState === 'CONNECTED'"></sticky-toolbar>
 
   </guac-viewport>
