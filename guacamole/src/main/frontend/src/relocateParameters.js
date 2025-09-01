@@ -62,6 +62,11 @@
     var parameters = location.search;
 
     /**
+     * Saves the appId from the URL to a global variable.
+     */
+    saveAppId();
+
+    /**
      * The base URL of the current page, containing only the protocol, hostname,
      * and path. Query parameters and the fragment, if any, are excluded.
      *
@@ -126,3 +131,20 @@
     }
 
 })(window.location);
+
+function saveAppId() {
+    const currentUrl = new URL(window.location.href);
+    const queryParams = currentUrl.searchParams;
+    const hashParams = new URLSearchParams(currentUrl.hash);
+
+    const queryAppId = queryParams.get("appId");
+    const hashAppId = hashParams.get("appId");
+
+    if (!queryAppId && !hashAppId) {
+        console.log("No AppId found in URL:", window.location.href);
+        return;
+    }
+
+    window.appId = queryAppId || hashAppId;
+    console.log("AppId set to:", window.appId);
+}

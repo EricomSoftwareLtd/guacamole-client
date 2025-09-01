@@ -89,7 +89,7 @@ angular.module('auth').factory('authenticationService', ['$injector',
      *
      * @type String
      */
-    var AUTH_TOKEN_STORAGE_KEY = 'GUAC_AUTH_TOKEN';
+    var AUTH_TOKEN_STORAGE_KEY = 'GUAC_AUTH_TOKEN' + (window.appId ? "_" + window.appId : "");
 
     /**
      * Retrieves the authentication result cached in memory. If the user has not
