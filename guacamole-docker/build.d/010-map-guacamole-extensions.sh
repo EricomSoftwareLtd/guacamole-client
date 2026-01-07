@@ -113,6 +113,7 @@ map_extensions <<'EOF'
     guacamole-auth-sso/ssl......................SSL_AUTH_
     guacamole-auth-totp.........................TOTP_
     guacamole-display-statistics................DISPLAY_STATISTICS_
+    guacamole-dns-resolution....................DNS_RESOLUTION_
     guacamole-history-recording-storage.........RECORDING_
     guacamole-vault/ksm.........................KSM_
 EOF

@@ -57,6 +57,7 @@
 
         <!-- Utility extensions -->
         <module>guacamole-display-statistics</module>
+        <module>guacamole-dns-resolution</module>
 
     </modules>
 

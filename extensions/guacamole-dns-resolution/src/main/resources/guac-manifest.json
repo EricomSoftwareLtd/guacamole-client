@@ -1,0 +1,12 @@
+{
+
+    "guacamoleVersion" : "1.6.0",
+
+    "name"      : "DNS Resolution Extension",
+    "namespace" : "dns-resolution",
+
+    "authProviders" : [
+        "org.apache.guacamole.auth.dns.DNSResolutionAuthenticationProvider"
+    ]
+
+}

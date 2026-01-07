@@ -216,6 +216,67 @@ public class KsmClient {
     private final Set<String> cachedAmbiguousDomains = new HashSet<>();
 
     /**
+     * A key combining a custom field label and value for indexing records
+     * by custom field content. Label comparison is case-insensitive (stored
+     * lowercase), while value comparison is exact.
+     */
+    private static class CustomFieldKey {
+
+        /**
+         * The custom field label, stored in lowercase for case-insensitive
+         * matching.
+         */
+        private final String label;
+
+        /**
+         * The custom field value, stored as-is for exact matching.
+         */
+        private final String value;
+
+        /**
+         * Creates a new CustomFieldKey with the given label and value.
+         *
+         * @param label
+         *     The custom field label (will be converted to lowercase).
+         *
+         * @param value
+         *     The custom field value (stored as-is).
+         */
+        CustomFieldKey(String label, String value) {
+            this.label = label != null ? label.toLowerCase(java.util.Locale.ROOT) : null;
+            this.value = value;
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(label, value);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null || getClass() != obj.getClass())
+                return false;
+            CustomFieldKey other = (CustomFieldKey) obj;
+            return java.util.Objects.equals(label, other.label)
+                    && java.util.Objects.equals(value, other.value);
+        }
+
+    }
+
+    /**
+     * All records retrieved from Keeper Secrets Manager, indexed by custom
+     * field label and value. Each key is a combination of a custom field
+     * label (lowercase) and its value (exact). A record may appear under
+     * multiple keys if it has multiple custom fields. The contents of this
+     * Map are automatically updated if {@link #validateCache()} refreshes
+     * the cache. This Map must not be accessed without {@link #cacheLock}
+     * acquired appropriately.
+     */
+    private final Map<CustomFieldKey, Set<KeeperRecord>> cachedRecordsByCustomField = new HashMap<>();
+
+    /**
      * Create a new KSM client based around the provided KSM configuration and
      * API timeout setting.
      *
@@ -287,6 +348,9 @@ public class KsmClient {
             cachedAmbiguousDomains.clear();
             cachedRecordsByDomain.clear();
 
+            // Clear cache of custom field-based records
+            cachedRecordsByCustomField.clear();
+
             // Parse configuration
             final boolean shouldSplitUsernames = confService.getSplitWindowsUsernames();
             final boolean shouldMatchByDomain = confService.getMatchUserRecordsByDomain();
@@ -336,6 +400,9 @@ public class KsmClient {
                 // accounts)
                 if (hostname == null)
                     addRecordForLogin(record, username, domain);
+
+                // Index all custom fields for custom field matching
+                addRecordForCustomFields(record);
 
             });
 
@@ -430,6 +497,63 @@ public class KsmClient {
     }
 
     /**
+     * Indexes the given record by all of its custom fields. Both Text and
+     * Hidden field types are indexed. The write lock of {@link #cacheLock}
+     * must already be acquired before invoking this function.
+     *
+     * @param record
+     *     The record to index by custom fields.
+     */
+    private void addRecordForCustomFields(KeeperRecord record) {
+
+        if (record == null)
+            return;
+
+        com.keepersecurity.secretsManager.core.KeeperRecordData data = record.getData();
+        if (data == null)
+            return;
+
+        List<com.keepersecurity.secretsManager.core.KeeperRecordField> customFields = data.getCustom();
+        if (customFields == null)
+            return;
+
+        for (com.keepersecurity.secretsManager.core.KeeperRecordField field : customFields) {
+
+            // Only index Text and Hidden field types
+            String label = field.getLabel();
+            if (label == null || label.isEmpty())
+                continue;
+
+            String value = null;
+
+            // Extract value from Text fields
+            if (field instanceof com.keepersecurity.secretsManager.core.Text) {
+                List<String> values = ((com.keepersecurity.secretsManager.core.Text) field).getValue();
+                if (values != null && values.size() == 1)
+                    value = values.get(0);
+            }
+            // Extract value from Hidden fields
+            else if (field instanceof com.keepersecurity.secretsManager.core.HiddenField) {
+                List<String> values = ((com.keepersecurity.secretsManager.core.HiddenField) field).getValue();
+                if (values != null && values.size() == 1)
+                    value = values.get(0);
+            }
+
+            // Skip fields with no value or empty value
+            if (value == null || value.isEmpty())
+                continue;
+
+            // Add record to the custom field index
+            CustomFieldKey key = new CustomFieldKey(label, value);
+            cachedRecordsByCustomField
+                    .computeIfAbsent(key, k -> new HashSet<>())
+                    .add(record);
+
+        }
+
+    }
+
+    /**
      * Returns all records accessible via Keeper Secrets Manager. The records
      * returned are arbitrarily ordered.
      *
@@ -445,6 +569,101 @@ public class KsmClient {
         cacheLock.readLock().lock();
         try {
             return Collections.unmodifiableCollection(cachedRecordsByUid.values());
+        }
+        finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Returns all records that match the specified custom field criteria.
+     * All criteria must match (AND logic). Field label matching is
+     * case-insensitive, while value matching is exact. If no criteria are
+     * provided, all records are returned. If no records match, an empty
+     * collection is returned. If multiple records match (ambiguous), a
+     * warning is logged and an empty collection is returned.
+     *
+     * @param criteria
+     *     Map of custom field labels (case-insensitive) to expected values
+     *     (exact match). All criteria must match for a record to be included.
+     *     May be null or empty, in which case all records are returned.
+     *
+     * @return
+     *     An unmodifiable collection containing the single record matching
+     *     all specified criteria, all records if no criteria specified, or
+     *     an empty collection if no records match or multiple records match
+     *     (ambiguous).
+     *
+     * @throws GuacamoleException
+     *     If an error occurs that prevents records from being retrieved.
+     */
+    public Collection<KeeperRecord> getRecordsMatchingCustomFields(
+            Map<String, String> criteria) throws GuacamoleException {
+
+        validateCache();
+        cacheLock.readLock().lock();
+        try {
+
+            // If no criteria specified, return all records
+            if (criteria == null || criteria.isEmpty())
+                return Collections.unmodifiableCollection(cachedRecordsByUid.values());
+
+            Set<KeeperRecord> result = null;
+
+            // Find intersection of all matching record sets (AND logic)
+            for (Map.Entry<String, String> entry : criteria.entrySet()) {
+
+                String label = entry.getKey();
+                String value = entry.getValue();
+
+                // Skip null/empty criteria
+                if (label == null || label.isEmpty() || value == null || value.isEmpty())
+                    continue;
+
+                // Look up records matching this criterion
+                CustomFieldKey key = new CustomFieldKey(label, value);
+                Set<KeeperRecord> matchingRecords = cachedRecordsByCustomField.get(key);
+
+                // If no records match this criterion, the result is empty
+                if (matchingRecords == null || matchingRecords.isEmpty()) {
+                    logger.debug("No Keeper records found matching custom field "
+                            + "\"{}\" with value \"{}\".", label, value);
+                    return Collections.emptySet();
+                }
+
+                // First criterion initializes the result set
+                if (result == null) {
+                    result = new HashSet<>(matchingRecords);
+                }
+                // Subsequent criteria intersect with existing results
+                else {
+                    result.retainAll(matchingRecords);
+
+                    // If intersection is empty, no need to continue
+                    if (result.isEmpty()) {
+                        logger.debug("No Keeper records found matching all "
+                                + "specified custom field criteria.");
+                        return Collections.emptySet();
+                    }
+                }
+
+            }
+
+            // If no valid criteria were processed, return all records
+            if (result == null)
+                return Collections.unmodifiableCollection(cachedRecordsByUid.values());
+
+            // If multiple records match, this is ambiguous - log warning and return empty
+            if (result.size() > 1) {
+                logger.warn("Multiple Keeper records ({}) match the specified "
+                        + "custom field criteria: {}. Cannot determine which "
+                        + "record to use. Please refine the match criteria to "
+                        + "uniquely identify a single record.", result.size(), criteria);
+                return Collections.emptySet();
+            }
+
+            return Collections.unmodifiableSet(result);
+
         }
         finally {
             cacheLock.readLock().unlock();
@@ -511,6 +730,61 @@ public class KsmClient {
     }
 
     /**
+     * Returns the record associated with the given hostname or IP address,
+     * searching only within the provided candidate records. If no such record
+     * exists within the candidates, or there are multiple such records, null
+     * is returned.
+     *
+     * @param hostname
+     *     The hostname of the record to return.
+     *
+     * @param candidates
+     *     The collection of candidate records to search within. If null or
+     *     empty, null is returned.
+     *
+     * @return
+     *     The record associated with the given hostname from within the
+     *     candidates, or null if there is no such record or multiple such
+     *     records.
+     *
+     * @throws GuacamoleException
+     *     If an error occurs that prevents the record from being retrieved.
+     */
+    public KeeperRecord getRecordByHost(String hostname,
+            Collection<KeeperRecord> candidates) throws GuacamoleException {
+
+        if (candidates == null || candidates.isEmpty())
+            return null;
+
+        validateCache();
+        cacheLock.readLock().lock();
+        try {
+
+            KeeperRecord found = null;
+            for (KeeperRecord record : candidates) {
+                String recordHostname = recordService.getHostname(record);
+                if (recordHostname != null && recordHostname.equals(hostname)) {
+                    // If we already found one, this is ambiguous
+                    if (found != null) {
+                        logger.debug("The hostname/address \"{}\" is referenced by "
+                                + "multiple Keeper records within the filtered set "
+                                + "and cannot be used to locate individual secrets.",
+                                hostname);
+                        return null;
+                    }
+                    found = record;
+                }
+            }
+
+            return found;
+
+        }
+        finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Returns the record associated with the given username and domain. If no
      * such record exists, or there are multiple such records, null is returned.
      *
@@ -554,6 +828,72 @@ public class KsmClient {
     }
 
     /**
+     * Returns the record associated with the given username and domain,
+     * searching only within the provided candidate records. If no such record
+     * exists within the candidates, or there are multiple such records, null
+     * is returned.
+     *
+     * @param username
+     *     The username of the record to return.
+     *
+     * @param domain
+     *     The domain of the record to return, or null if no domain exists.
+     *
+     * @param candidates
+     *     The collection of candidate records to search within. If null or
+     *     empty, null is returned.
+     *
+     * @return
+     *     The record associated with the given username and domain from within
+     *     the candidates, or null if there is no such record or multiple such
+     *     records.
+     *
+     * @throws GuacamoleException
+     *     If an error occurs that prevents the record from being retrieved.
+     */
+    public KeeperRecord getRecordByLogin(String username, String domain,
+            Collection<KeeperRecord> candidates) throws GuacamoleException {
+
+        if (candidates == null || candidates.isEmpty())
+            return null;
+
+        validateCache();
+        cacheLock.readLock().lock();
+        try {
+
+            KeeperRecord found = null;
+            for (KeeperRecord record : candidates) {
+                String recordUsername = recordService.getUsername(record);
+                String recordDomain = recordService.getDomain(record);
+
+                // Check username match
+                if (recordUsername == null || !recordUsername.equals(username))
+                    continue;
+
+                // Check domain match (both null or both equal)
+                if (!java.util.Objects.equals(recordDomain, domain))
+                    continue;
+
+                // If we already found one, this is ambiguous
+                if (found != null) {
+                    logger.debug("The username \"{}\" with domain \"{}\" is "
+                            + "referenced by multiple Keeper records within "
+                            + "the filtered set and cannot be used to locate "
+                            + "individual secrets.", username, domain);
+                    return null;
+                }
+                found = record;
+            }
+
+            return found;
+
+        }
+        finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Returns the record associated with the given domain. If no such record
      * exists, or there are multiple such records, null is returned.
      *
@@ -580,6 +920,60 @@ public class KsmClient {
             }
 
             return cachedRecordsByDomain.get(domain);
+
+        }
+        finally {
+            cacheLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Returns the record associated with the given domain, searching only
+     * within the provided candidate records. If no such record exists within
+     * the candidates, or there are multiple such records, null is returned.
+     *
+     * @param domain
+     *     The domain of the record to return.
+     *
+     * @param candidates
+     *     The collection of candidate records to search within. If null or
+     *     empty, null is returned.
+     *
+     * @return
+     *     The record associated with the given domain from within the
+     *     candidates, or null if there is no such record or multiple such
+     *     records.
+     *
+     * @throws GuacamoleException
+     *     If an error occurs that prevents the record from being retrieved.
+     */
+    public KeeperRecord getRecordByDomain(String domain,
+            Collection<KeeperRecord> candidates) throws GuacamoleException {
+
+        if (candidates == null || candidates.isEmpty())
+            return null;
+
+        validateCache();
+        cacheLock.readLock().lock();
+        try {
+
+            KeeperRecord found = null;
+            for (KeeperRecord record : candidates) {
+                String recordDomain = recordService.getDomain(record);
+                if (recordDomain != null && recordDomain.equals(domain)) {
+                    // If we already found one, this is ambiguous
+                    if (found != null) {
+                        logger.debug("The domain \"{}\" is referenced by "
+                                + "multiple Keeper records within the filtered "
+                                + "set and cannot be used to locate individual "
+                                + "secrets.", domain);
+                        return null;
+                    }
+                    found = record;
+                }
+            }
+
+            return found;
 
         }
         finally {

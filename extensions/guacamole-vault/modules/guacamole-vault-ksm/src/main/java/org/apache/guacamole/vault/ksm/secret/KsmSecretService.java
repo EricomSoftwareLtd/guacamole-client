@@ -27,11 +27,9 @@ import com.keepersecurity.secretsManager.core.SecretsManagerOptions;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -180,6 +178,24 @@ public class KsmSecretService implements VaultSecretService {
     }
 
     /**
+     * Returns a masked version of the given string for safe logging.
+     * Shows first 2 characters followed by asterisks.
+     *
+     * @param value
+     *     The value to mask.
+     *
+     * @return
+     *     A masked version of the value, or null if the value is null.
+     */
+    private String maskValue(String value) {
+        if (value == null)
+            return null;
+        if (value.length() <= 2)
+            return "**";
+        return value.substring(0, 2) + "****";
+    }
+
+    /**
      * Adds contextual parameter tokens for the secrets in the given record to
      * the given map of existing tokens. The values of each token are
      * determined from secrets within the record. Depending on the record, this
@@ -201,8 +217,13 @@ public class KsmSecretService implements VaultSecretService {
     private void addRecordTokens(Map<String, Future<String>> tokens, String prefix,
             KeeperRecord record) throws GuacamoleException {
 
-        if (record == null)
+        if (record == null) {
+            logger.debug("Keeper credential retrieval: record=null, success=false");
             return;
+        }
+
+        logger.debug("Keeper credential retrieval: recordUid={}, success=true",
+                record.getRecordUid());
 
         // Domain of server-related record
         String domain = recordService.getDomain(record);
@@ -211,6 +232,8 @@ public class KsmSecretService implements VaultSecretService {
 
         // Username of server-related record
         String username = recordService.getUsername(record);
+        logger.debug("Keeper username retrieval: success={}, masked={}",
+                username != null, maskValue(username));
         if (username != null) {
 
             // If the record had no directly defined domain, but there is a
@@ -239,6 +262,8 @@ public class KsmSecretService implements VaultSecretService {
 
         // Password of server-related record
         String password = recordService.getPassword(record);
+        logger.debug("Keeper password retrieval: success={}, length={}",
+                password != null, password != null ? password.length() : 0);
         if (password != null)
             tokens.put(prefix + "PASSWORD", CompletableFuture.completedFuture(password));
 
@@ -404,13 +429,45 @@ public class KsmSecretService implements VaultSecretService {
     }
 
     /**
+     * Applies the token filter to all values in the given criteria map,
+     * returning a new map with filtered values.
+     *
+     * @param criteria
+     *     The criteria map with values that may contain tokens.
+     *
+     * @param filter
+     *     The token filter to apply to each value.
+     *
+     * @return
+     *     A new map with the same keys but filtered values.
+     */
+    private Map<String, String> filterCriteriaValues(
+            Map<String, String> criteria, TokenFilter filter) {
+
+        if (criteria == null || criteria.isEmpty())
+            return criteria;
+
+        Map<String, String> filtered = new HashMap<>();
+        for (Map.Entry<String, String> entry : criteria.entrySet())
+            filtered.put(entry.getKey(), filter.filter(entry.getValue()));
+
+        return filtered;
+
+    }
+
+    /**
      * Use the provided KSM client to add parameter tokens tokens to the
      * provided token map. The supplied filter will be used to replace
      * existing tokens in the provided connection parameters before KSM
      * record lookup. The supplied GuacamoleConfiguration instance will
      * be used to check the protocol, in case RDP-specific behavior is
      * needed.
-
+     *
+     * <p>If custom field match criteria are specified via {@code ksm-match-*}
+     * parameters, records will first be filtered by those criteria before
+     * hostname/username/domain matching is applied. This allows selecting
+     * specific credentials when multiple KSM records exist for the same host.
+     *
      * @param config
      *    The GuacamoleConfiguration associated with the Connectable for which
      *    tokens are being added.
@@ -433,20 +490,66 @@ public class KsmSecretService implements VaultSecretService {
             GuacamoleConfiguration config, KsmClient ksm, Map<String, Future<String>> tokens,
             Map<String, String> parameters, TokenFilter filter) throws GuacamoleException {
 
+        // Extract custom field match criteria for main credentials
+        Map<String, String> matchCriteria = filterCriteriaValues(
+                CustomFieldMatchCriteria.extractCriteria(
+                        parameters, CustomFieldMatchCriteria.MATCH_PREFIX),
+                filter);
+
+        // Get filtered candidates based on custom field criteria (null if no criteria)
+        Collection<com.keepersecurity.secretsManager.core.KeeperRecord> candidates =
+                matchCriteria.isEmpty() ? null : ksm.getRecordsMatchingCustomFields(matchCriteria);
+
+        // Log if custom field filtering is active
+        if (!matchCriteria.isEmpty()) {
+            logger.debug("Custom field match criteria specified: {}. "
+                    + "Filtered to {} candidate records.",
+                    matchCriteria.keySet(),
+                    candidates != null ? candidates.size() : 0);
+        }
+
         // Retrieve and define server-specific tokens, if any
         String hostname = parameters.get("hostname");
-        if (hostname != null && !hostname.isEmpty())
+        if (hostname != null && !hostname.isEmpty()) {
+            String filteredHostname = filter.filter(hostname);
             addRecordTokens(tokens, "KEEPER_SERVER_",
-                    ksm.getRecordByHost(filter.filter(hostname)));
+                    candidates != null
+                            ? ksm.getRecordByHost(filteredHostname, candidates)
+                            : ksm.getRecordByHost(filteredHostname));
+        }
 
         // Tokens specific to RDP
         if ("rdp".equals(config.getProtocol())) {
 
+            // Extract gateway-specific custom field match criteria
+            Map<String, String> gatewayMatchCriteria = filterCriteriaValues(
+                    CustomFieldMatchCriteria.extractCriteria(
+                            parameters, CustomFieldMatchCriteria.GATEWAY_MATCH_PREFIX),
+                    filter);
+
+            // Get filtered candidates for gateway credentials
+            Collection<com.keepersecurity.secretsManager.core.KeeperRecord> gatewayCandidates =
+                    gatewayMatchCriteria.isEmpty()
+                            ? null
+                            : ksm.getRecordsMatchingCustomFields(gatewayMatchCriteria);
+
+            // Log if gateway custom field filtering is active
+            if (!gatewayMatchCriteria.isEmpty()) {
+                logger.debug("Gateway custom field match criteria specified: {}. "
+                        + "Filtered to {} candidate records.",
+                        gatewayMatchCriteria.keySet(),
+                        gatewayCandidates != null ? gatewayCandidates.size() : 0);
+            }
+
             // Retrieve and define gateway server-specific tokens, if any
             String gatewayHostname = parameters.get("gateway-hostname");
-            if (gatewayHostname != null && !gatewayHostname.isEmpty())
+            if (gatewayHostname != null && !gatewayHostname.isEmpty()) {
+                String filteredGatewayHostname = filter.filter(gatewayHostname);
                 addRecordTokens(tokens, "KEEPER_GATEWAY_",
-                        ksm.getRecordByHost(filter.filter(gatewayHostname)));
+                        gatewayCandidates != null
+                                ? ksm.getRecordByHost(filteredGatewayHostname, gatewayCandidates)
+                                : ksm.getRecordByHost(filteredGatewayHostname));
+            }
 
             // Retrieve and define domain tokens, if any
             String domain = parameters.get("domain");
@@ -454,7 +557,9 @@ public class KsmSecretService implements VaultSecretService {
             if (domain != null && !domain.isEmpty()) {
                 filteredDomain = filter.filter(domain);
                 addRecordTokens(tokens, "KEEPER_DOMAIN_",
-                        ksm.getRecordByDomain(filteredDomain));
+                        candidates != null
+                                ? ksm.getRecordByDomain(filteredDomain, candidates)
+                                : ksm.getRecordByDomain(filteredDomain));
             }
 
             // Retrieve and define gateway domain tokens, if any
@@ -463,7 +568,9 @@ public class KsmSecretService implements VaultSecretService {
             if (gatewayDomain != null && !gatewayDomain.isEmpty()) {
                 filteredGatewayDomain = filter.filter(gatewayDomain);
                 addRecordTokens(tokens, "KEEPER_GATEWAY_DOMAIN_",
-                        ksm.getRecordByDomain(filteredGatewayDomain));
+                        gatewayCandidates != null
+                                ? ksm.getRecordByDomain(filteredGatewayDomain, gatewayCandidates)
+                                : ksm.getRecordByDomain(filteredGatewayDomain));
             }
 
             // If domain matching is disabled for user records,
@@ -476,18 +583,23 @@ public class KsmSecretService implements VaultSecretService {
 
             // Retrieve and define user-specific tokens, if any
             String username = parameters.get("username");
-            if (username != null && !username.isEmpty())
+            if (username != null && !username.isEmpty()) {
+                String filteredUsername = filter.filter(username);
                 addRecordTokens(tokens, "KEEPER_USER_",
-                        ksm.getRecordByLogin(filter.filter(username),
-                        filteredDomain));
+                        candidates != null
+                                ? ksm.getRecordByLogin(filteredUsername, filteredDomain, candidates)
+                                : ksm.getRecordByLogin(filteredUsername, filteredDomain));
+            }
 
             // Retrieve and define gateway user-specific tokens, if any
             String gatewayUsername = parameters.get("gateway-username");
-            if (gatewayUsername != null && !gatewayUsername.isEmpty())
+            if (gatewayUsername != null && !gatewayUsername.isEmpty()) {
+                String filteredGatewayUsername = filter.filter(gatewayUsername);
                 addRecordTokens(tokens, "KEEPER_GATEWAY_USER_",
-                        ksm.getRecordByLogin(
-                            filter.filter(gatewayUsername),
-                            filteredGatewayDomain));
+                        gatewayCandidates != null
+                                ? ksm.getRecordByLogin(filteredGatewayUsername, filteredGatewayDomain, gatewayCandidates)
+                                : ksm.getRecordByLogin(filteredGatewayUsername, filteredGatewayDomain));
+            }
         }
 
         else {
@@ -497,9 +609,13 @@ public class KsmSecretService implements VaultSecretService {
             // field in the connection parameters, so the domain
             // will always be null
             String username = parameters.get("username");
-            if (username != null && !username.isEmpty())
+            if (username != null && !username.isEmpty()) {
+                String filteredUsername = filter.filter(username);
                 addRecordTokens(tokens, "KEEPER_USER_",
-                        ksm.getRecordByLogin(filter.filter(username), null));
+                        candidates != null
+                                ? ksm.getRecordByLogin(filteredUsername, null, candidates)
+                                : ksm.getRecordByLogin(filteredUsername, null));
+            }
         }
     }
 

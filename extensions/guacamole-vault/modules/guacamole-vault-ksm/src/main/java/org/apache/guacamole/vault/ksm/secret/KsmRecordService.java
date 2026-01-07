@@ -642,4 +642,49 @@ public class KsmRecordService {
 
     }
 
+    /**
+     * Returns the value of a custom field with the given label. Both Text and
+     * Hidden field types are searched. Label matching is case-insensitive.
+     * If the field is not found, has no value, has an empty value, or has
+     * multiple values, null is returned.
+     *
+     * @param record
+     *     The record to search for the custom field.
+     *
+     * @param label
+     *     The label of the custom field to find (case-insensitive).
+     *
+     * @return
+     *     The value of the custom field with the given label, or null if not
+     *     found, empty, or ambiguous.
+     */
+    public String getCustomFieldValue(KeeperRecord record, String label) {
+
+        if (record == null || label == null || label.isEmpty())
+            return null;
+
+        KeeperRecordData data = record.getData();
+        List<KeeperRecordField> custom = data.getCustom();
+
+        if (custom == null)
+            return null;
+
+        // Create a case-insensitive pattern for the label
+        Pattern labelPattern = Pattern.compile(
+                Pattern.quote(label), Pattern.CASE_INSENSITIVE);
+
+        // First check Text custom fields
+        Text textField = getField(custom, Text.class, labelPattern);
+        if (textField != null)
+            return getSingleStringValue(textField.getValue());
+
+        // Fall back to Hidden custom fields
+        HiddenField hiddenField = getField(custom, HiddenField.class, labelPattern);
+        if (hiddenField != null)
+            return getSingleStringValue(hiddenField.getValue());
+
+        return null;
+
+    }
+
 }
