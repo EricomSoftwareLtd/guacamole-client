@@ -119,6 +119,12 @@ angular.module('osk').directive('guacOsk', [function guacOsk() {
 
             }); // end layout scope watch
 
+            // Release any pressed modifiers when the OSK is destroyed
+            $scope.$on('$destroy', function() {
+                if (keyboard)
+                    keyboard.releaseAllModifiers();
+            });
+
         }]
 
     };

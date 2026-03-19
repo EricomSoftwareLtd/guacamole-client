@@ -210,6 +210,25 @@ Guacamole.OnScreenKeyboard = function(layout) {
     };
 
     /**
+     * Releases all currently-pressed modifier keys, firing the onkeyup event
+     * for each active modifier, and resets all key pressed states. Only
+     * modifiers that are actually active will produce keyup events.
+     */
+    this.releaseAllModifiers = function() {
+
+        // Release all active modifiers
+        for (var modifier in modifierKeysyms) {
+            var keysym = modifierKeysyms[modifier];
+            if (keysym && osk.onkeyup)
+                osk.onkeyup(keysym);
+        }
+
+        modifierKeysyms = {};
+        pressed = {};
+
+    };
+
+    /**
      * Returns whether all modifiers having the given names are currently
      * active.
      *
