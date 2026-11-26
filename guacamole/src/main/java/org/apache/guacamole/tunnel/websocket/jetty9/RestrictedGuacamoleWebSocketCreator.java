@@ -19,8 +19,8 @@
 
 package org.apache.guacamole.tunnel.websocket.jetty9;
 
-import org.eclipse.jetty.websocket.api.UpgradeRequest;
-import org.eclipse.jetty.websocket.api.UpgradeResponse;
+import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
+import org.eclipse.jetty.websocket.servlet.ServletUpgradeResponse;
 import org.eclipse.jetty.websocket.servlet.WebSocketCreator;
 import org.apache.guacamole.tunnel.TunnelRequestService;
 
@@ -47,7 +47,7 @@ public class RestrictedGuacamoleWebSocketCreator implements WebSocketCreator {
     }
 
     @Override
-    public Object createWebSocket(UpgradeRequest request, UpgradeResponse response) {
+    public Object createWebSocket(ServletUpgradeRequest request, ServletUpgradeResponse response) {
 
         // Validate and use "guacamole" subprotocol
         for (String subprotocol : request.getSubProtocols()) {

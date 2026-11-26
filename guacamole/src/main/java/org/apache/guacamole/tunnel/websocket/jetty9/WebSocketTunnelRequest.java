@@ -19,7 +19,6 @@
 
 package org.apache.guacamole.tunnel.websocket.jetty9;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.jetty.websocket.api.UpgradeRequest;
@@ -33,7 +32,7 @@ public class WebSocketTunnelRequest extends TunnelRequest {
     /**
      * All parameters passed via HTTP to the WebSocket handshake.
      */
-    private final Map<String, String[]> handshakeParameters;
+    private final Map<String, List<String>> handshakeParameters;
     
     /**
      * Creates a TunnelRequest implementation which delegates parameter and
@@ -61,11 +60,11 @@ public class WebSocketTunnelRequest extends TunnelRequest {
     @Override
     public List<String> getParameterValues(String name) {
 
-        String[] values = handshakeParameters.get(name);
+        List<String> values = handshakeParameters.get(name);
         if (values == null)
             return null;
 
-        return Arrays.asList(values);
+        return values;
     }
     
 }

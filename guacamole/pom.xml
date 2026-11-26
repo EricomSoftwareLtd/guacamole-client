@@ -211,11 +211,11 @@
 
     <dependencies>
 
-        <!-- Java servlet API -->
+        <!-- Java servlet API (Tomcat 9 provides Servlet 4.0) -->
         <dependency>
             <groupId>javax.servlet</groupId>
-            <artifactId>servlet-api</artifactId>
-            <version>2.5</version>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
             <scope>provided</scope>
         </dependency>
 
@@ -223,7 +223,7 @@
         <dependency>
             <groupId>javax.websocket</groupId>
             <artifactId>javax.websocket-api</artifactId>
-            <version>1.0</version>
+            <version>1.1</version>
             <scope>provided</scope>
         </dependency>
 
@@ -266,48 +266,25 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Jetty 8 servlet API (websocket)  -->
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-websocket</artifactId>
-            <version>8.1.1.v20120215</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- Jetty 9.0 servlet API (websocket)  -->
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-parent</artifactId>
-            <version>20</version>
-            <scope>provided</scope>
-            <type>pom</type>
-        </dependency>
+        <!-- Jetty 9 WebSocket API (provided scope - for compilation only) -->
         <dependency>
             <groupId>org.eclipse.jetty.websocket</groupId>
             <artifactId>websocket-api</artifactId>
-            <version>9.0.7.v20131107</version>
+            <version>9.4.58.v20250814</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty.websocket</groupId>
             <artifactId>websocket-servlet</artifactId>
-            <version>9.0.7.v20131107</version>
+            <version>9.4.58.v20250814</version>
             <scope>provided</scope>
-        </dependency>
-
-        <!-- Tomcat servlet API (websocket)  -->
-        <dependency>
-            <groupId>org.apache.tomcat</groupId>
-            <artifactId>tomcat-catalina</artifactId>
-            <version>7.0.37</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.tomcat</groupId>
-            <artifactId>tomcat-coyote</artifactId>
-            <version>7.0.37</version>
-            <scope>provided</scope>
+            <exclusions>
+                <!-- Avoid convergence conflict with our javax.servlet-api 4.0.1 -->
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>javax.servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Guice - Dependency Injection -->

@@ -96,7 +96,7 @@ public abstract class GuacamoleWebSocketTunnelListener implements WebSocketListe
             String message = Integer.toString(guacamoleStatusCode);
             session.close(new CloseStatus(webSocketCode, message));
         }
-        catch (IOException e) {
+        catch (Exception e) {
             logger.debug("Unable to close WebSocket connection.", e);
         }
 
